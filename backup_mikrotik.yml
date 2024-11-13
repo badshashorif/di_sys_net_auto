@@ -4,16 +4,18 @@
   gather_facts: false
   vars:
     backup_dir: "/root/network/backup"
-  tasks:
-    - name: Export Mikrotik configuration to file
-      ansible.builtin.shell: >-
-        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} '/export file={{ inventory_hostname }}_backup'
-      register: export
-      delegate_to: localhost
 
-   - name: Download file from the mikrotik devices
-      ansible.builtin.copy:
-        content: "{{ export.stdout }}"
-        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-      when: export is defined
+  tasks:
+    - name: Export MikroTik configuration to file (secure)
+      ansible.netcommon.command:
+        command: /export file={{ inventory_hostname }}_backup
       delegate_to: localhost
+      become: true
+      register: export
+
+    - name: Download the backup file from the MikroTik device (if export successful)
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_backup.rsc"  # Assuming .rsc extension
+        dest: "{{ backup_dir }}/"
+        flat: yes
+      when: export is defined  # Download only if export succeeded
