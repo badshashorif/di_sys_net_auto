@@ -1,23 +1,19 @@
 ---
-- name: Backup Mikrotik Routers
+- name: Backup Mikrotik
   hosts: mikrotik
-  gather_facts: no
-
+  gather_facts: false
+  vars:
+    backup_dir: "/root/network/backup"
   tasks:
-    - name: Export configuration on Mikrotik router
-      community.routeros.routeros_command:
-        commands:
-          - /export file=backup_{{ inventory_hostname }}
-      register: backup_output
+    - name: Export
+      ansible.builtin.shell: >-
+        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} /export        
+      register: export
+      delegate_to: localhost
 
-    - name: Download backup file
-      community.routeros.routeros_file:
-        src: backup_{{ inventory_hostname }}.rsc
-        dest: /root/network/backup/backup_{{ inventory_hostname }}.rsc
-        mode: get
-
-    - name: Remove backup file from Mikrotik router
-      community.routeros.routeros_command:
-        commands:
-          - /file remove backup_{{ inventory_hostname }}
-      when: backup_output is succeeded
+   - name: Backup
+      ansible.builtin.copy:
+        content: "{{ export.stdout }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+      when: export is defined
+      delegate_to: localhost
