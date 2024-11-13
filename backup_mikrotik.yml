@@ -5,15 +5,16 @@
   vars:
     backup_dir: "/root/network/backup"
   tasks:
-    - name: Export
+    - name: Export Mikrotik configuration to file
       ansible.builtin.shell: >-
-        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} /export        
+        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} '/export file={{ inventory_hostname }}_backup'
+      delegate_to: localhost
       register: export
-      delegate_to: localhost
 
-   - name: Backup
-      ansible.builtin.copy:
-        content: "{{ export.stdout }}"
-        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-      when: export is defined
+    - name: Download the backup file
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_backup.rsc"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.rsc"
+        flat: yes
       delegate_to: localhost
+      when: export is defined
