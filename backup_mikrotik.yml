@@ -1,24 +1,20 @@
-# mikrotik_backup.yml
 ---
 - name: Backup Mikrotik Routers
   hosts: mikrotik
   gather_facts: no
 
   tasks:
-    - name: Backup Router Config
-      routeros_command:
-        commands:
-          - /export file=backup_{{ inventory_hostname }}
+    - name: Export configuration on Mikrotik router
+      ansible.builtin.shell: "/export file=backup_{{ inventory_hostname }}"
       register: backup_output
 
-    - name: Download Backup File
-      routeros_file:
-        src: backup_{{ inventory_hostname }}.rsc
-        dest: /root/network/backup/backup_{{ inventory_hostname }}.rsc
-        mode: get
+    - name: Download backup file
+      ansible.builtin.fetch:
+        src: /backup_{{ inventory_hostname }}.rsc
+        dest: /root/network/backup
+        flat: yes
 
-    - name: Delete Backup File from Router
-      routeros_command:
-        commands:
-          - /file remove backup_{{ inventory_hostname }}
+    - name: Remove backup file from Mikrotik router
+      ansible.builtin.shell: "/file remove backup_{{ inventory_hostname }}"
       when: backup_output is succeeded
+
