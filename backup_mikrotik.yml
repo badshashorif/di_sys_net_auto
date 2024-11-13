@@ -13,7 +13,7 @@
 
     - name: Download the backup file from the MikroTik device
       ansible.builtin.fetch:
-        src: "/{{ inventory_hostname }}_backup.rsc"
+        src: "/{{ inventory_hostname }}_backup.rsc"  # Adding the .rsc extension
         dest: "{{ backup_dir }}/"
         flat: yes
       when: export is defined
