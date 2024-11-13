@@ -5,16 +5,19 @@
 
   tasks:
     - name: Export configuration on Mikrotik router
-      ansible.builtin.shell: "/export file=backup_{{ inventory_hostname }}"
+      community.routeros.routeros_command:
+        commands:
+          - /export file=backup_{{ inventory_hostname }}
       register: backup_output
 
     - name: Download backup file
-      ansible.builtin.fetch:
-        src: /backup_{{ inventory_hostname }}.rsc
-        dest: /root/network/backup
-        flat: yes
+      community.routeros.routeros_file:
+        src: backup_{{ inventory_hostname }}.rsc
+        dest: /root/network/backup/backup_{{ inventory_hostname }}.rsc
+        mode: get
 
     - name: Remove backup file from Mikrotik router
-      ansible.builtin.shell: "/file remove backup_{{ inventory_hostname }}"
+      community.routeros.routeros_command:
+        commands:
+          - /file remove backup_{{ inventory_hostname }}
       when: backup_output is succeeded
-
