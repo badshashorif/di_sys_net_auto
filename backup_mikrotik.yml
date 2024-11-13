@@ -7,11 +7,11 @@
   tasks:
     - name: Export Mikrotik configuration to file
       ansible.builtin.shell: >-
-        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} /export file={{ inventory_hostname }}_backup
+        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} '/export file={{ inventory_hostname }}_backup'
       register: export
       delegate_to: localhost
 
-    - name: Download the backup file from MikroTik router
+    - name: Download the backup file from the MikroTik device
       ansible.builtin.fetch:
         src: "/{{ inventory_hostname }}_backup.rsc"
         dest: "{{ backup_dir }}/"
