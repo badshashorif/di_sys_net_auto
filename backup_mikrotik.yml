@@ -2,17 +2,18 @@
 - name: Backup Mikrotik
   hosts: mikrotik
   gather_facts: false
-  vars: 
+  vars:
     backup_dir: "/root/network/backup"
   tasks:
-    - name: Export
-      ansible.builtin.shell: >-
-        sshpass -p '{{ ansible_password }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} /export
-      register: export
-      delegate_to: localhost
-    - name: Backup
-      ansible.builtin.copy:
-        content: "{{ export.stdout }}"
-        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-      when: export is defined
-      delegate_to: localhost
+  - name: Export MikroTik Configuration
+    community.routeros.command:
+      commands: /export
+    register: export_data
+    delegate_to: localhost
+  - name: Create Backup File with Timestamp
+    ansible.builtin.template:
+      src: mikrotik_config.j2
+      dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+    vars:
+      config: "{{ export_data.stdout }}"
+    delegate_to: localhost
