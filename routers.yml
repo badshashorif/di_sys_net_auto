@@ -1,5 +1,29 @@
-- name: Configure Routers
-  hosts: mikrotik
+---
+- name: Backup MikroTik Router Configurations
+  hosts: mikrotik_routers
+  gather_facts: no
   tasks:
-    - name: Ping test
-      ping:
+    - name: Ensure backup directory exists
+      local_action:
+        module: file
+        path: "./backups"
+        state: directory
+      delegate_to: localhost
+
+    - name: Backup router configuration
+      community.routeros.routeros_command:
+        commands:
+          - /export
+      register: backup_output
+
+    - name: Save backup to local file
+      local_action:
+        module: copy
+        content: "{{ backup_output.stdout[0] }}"
+        dest: "./backups/{{ inventory_hostname }}_backup_{{ ansible_date_time.date }}.rsc"
+      delegate_to: localhost
+
+    - name: Display backup success message
+      debug:
+        msg: "Backup for {{ inventory_hostname }} completed and saved to ./backups/{{ inventory_hostname }}_backup_{{ ansible_date_time.date }}.rsc"
+
