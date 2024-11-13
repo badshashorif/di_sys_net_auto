@@ -14,7 +14,7 @@
     - name: Download Backup File
       routeros_file:
         src: backup_{{ inventory_hostname }}.rsc
-        dest: /root/network/backup_{{ inventory_hostname }}.rsc
+        dest: /root/network/backup/backup_{{ inventory_hostname }}.rsc
         mode: get
 
     - name: Delete Backup File from Router
