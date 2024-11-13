@@ -1,19 +1,24 @@
+# mikrotik_backup.yml
 ---
-- name: Backup Mikrotik
+- name: Backup Mikrotik Routers
   hosts: mikrotik
-  gather_facts: false
-  vars:
-    backup_dir: "/root/network/backup"
+  gather_facts: no
+
   tasks:
-  - name: Export MikroTik Configuration
-    community.routeros.command:
-      commands: /export
-    register: export_data
-    delegate_to: localhost
-  - name: Create Backup File with Timestamp
-    ansible.builtin.template:
-      src: mikrotik_config.j2
-      dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-    vars:
-      config: "{{ export_data.stdout }}"
-    delegate_to: localhost
+    - name: Backup Router Config
+      routeros_command:
+        commands:
+          - /export file=backup_{{ inventory_hostname }}
+      register: backup_output
+
+    - name: Download Backup File
+      routeros_file:
+        src: backup_{{ inventory_hostname }}.rsc
+        dest: /root/network/backup_{{ inventory_hostname }}.rsc
+        mode: get
+
+    - name: Delete Backup File from Router
+      routeros_command:
+        commands:
+          - /file remove backup_{{ inventory_hostname }}
+      when: backup_output is succeeded
