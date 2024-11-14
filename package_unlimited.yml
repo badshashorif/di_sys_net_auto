@@ -17,16 +17,9 @@
         register: sshpass
         delegate_to: localhost
 
-      - ansible.builtin.fail:
-          msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
-        when: sshpass.stdout|length == 0
-
-      - name: gather export (with password authentication)
+      - name: Execute PACKAGE--UNLIMITED (with password authentication)
         # shell with delegate_to: localhost works better that ansible.builtin.raw  
         ansible.builtin.shell: >-
           sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} system/script/run UNLIMITED
-        register: export
+        register: execute
         delegate_to: localhost
