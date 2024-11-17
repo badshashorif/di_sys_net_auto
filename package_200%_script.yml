@@ -17,7 +17,7 @@
         register: sshpass
         delegate_to: localhost
 
-      - name: Execute PACKAGE--50% (with password authentication)
+      - name: Execute PACKAGE--200% (with password authentication)
         # shell with delegate_to: localhost works better that ansible.builtin.raw  
         ansible.builtin.shell: >-
           sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} /system/script/run PACKAGE--200%
