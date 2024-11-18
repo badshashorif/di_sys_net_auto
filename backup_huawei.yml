@@ -2,7 +2,7 @@
 - hosts: HUAWEI
   gather_facts: no
   vars:
-    backup_dir: "/root/network/backups/JUNIPER"
+    backup_dir: "/root/network/backups/HUAWEI"
   tasks:
 
     - name: Set ssh port (set defualt 22 port when port is not defined)
