@@ -1,5 +1,5 @@
 ---
-- hosts: ACCESS_RTR
+- hosts: mikrotik
   gather_facts: no
   vars:
     backup_dir: "/root/network/backup"
