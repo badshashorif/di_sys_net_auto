@@ -5,7 +5,14 @@
     backup_dir: "/root/network/backups/HUAWEI"
   tasks:
 
-    - name: Set ssh port (set defualt 22 port when port is not defined)
+    - name: Ensure backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+
+    - name: Set ssh port (set default 22 port when port is not defined)
       set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
@@ -21,39 +28,37 @@
 
       - ansible.builtin.fail:
           msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
+            Playbook requires sshpass to use password authentication. Please install
+            sshpass and re-run the same playbook. 
+            See https://www.redhat.com/sysadmin/ssh-automation-sshpass for details.
         when: sshpass.stdout|length == 0
 
-      - name: gather export (with password authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
+      - name: Gather configuration (with password authentication)
         ansible.builtin.shell: >-
           sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "display current-configuration"
         register: export
         delegate_to: localhost
 
-      - name: store export to local file
+      - name: Store configuration to local file
         ansible.builtin.copy:
           content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
         when: export is defined
         delegate_to: localhost
 
-    - name: Run backup withot password (when password is not defined)
+    - name: Run backup without password (when password is not defined)
       when: ansible_ssh_pass is not defined
       block:
 
-      - name: gather export (with passwordless authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
+      - name: Gather configuration (with passwordless authentication)
         ansible.builtin.shell: >-
-          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} show configuration |display set
+          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "display current-configuration"
         register: export
         delegate_to: localhost
 
-      - name: store export to local file
+      - name: Store configuration to local file
         ansible.builtin.copy:
           content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
         when: export is defined
         delegate_to: localhost
