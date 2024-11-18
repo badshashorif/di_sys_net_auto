@@ -35,7 +35,7 @@
 
       - name: Gather configuration (with password authentication)
         ansible.builtin.shell: >-
-          sshpass -p '{{ ansible_ssh_pass }}' ssh -o ConnectTimeout=60 -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "display current-configuration"
+          sshpass -p '{{ ansible_ssh_pass }}' ssh -o ConnectTimeout=60 -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "system-view; screen-width 512; return; display current-configuration"
         register: export
         delegate_to: localhost
 
