@@ -1,5 +1,5 @@
 ---
-- hosts: mikrotik
+- hosts: NAT_RTR
   gather_facts: no
   tasks:
 
