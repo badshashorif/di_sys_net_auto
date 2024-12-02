@@ -1,59 +1,58 @@
 ---
-- hosts: Huawei_SW
+- name: Backup Huawei Switch Configuration
+  hosts: HUAWEI_SW
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/HUAWEI"
   tasks:
-
-    - name: Set ssh port (set defualt 22 port when port is not defined)
+    - name: Ensure SSH port is set
       set_fact:
-        ansible_port: "{{ ansible_port | default(22) }}"
+        ansible_port: "{{ ansible_port | default(9337) }}"
 
-    - name: Run backup with password (when password is defined)
+    - name: Backup configuration (with password authentication)
       when: ansible_ssh_pass is defined
       block:
+        - name: Check if sshpass is installed
+          shell: which sshpass
+          register: sshpass_check
+          delegate_to: localhost
+          run_once: true
 
-      - name: Ensure that sshpass is installed
-        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
-        run_once: yes
-        register: sshpass
-        delegate_to: localhost
+        - name: Fail if sshpass is not installed
+          fail:
+            msg: >-
+              sshpass is required for password-based SSH authentication.
+              Please install sshpass on the Semaphore host and rerun the playbook.
+          when: sshpass_check.stdout == ""
 
-      - ansible.builtin.fail:
-          msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
-        when: sshpass.stdout|length == 0
+        - name: Gather configuration using sshpass
+          shell: >
+            sshpass -p '{{ ansible_ssh_pass }}'
+            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
+            {{ ansible_user }}@{{ inventory_hostname }}
+            "display current-configuration"
+          register: export
+          delegate_to: localhost
 
-      - name: gather export (with password authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "display current configuration"
-        register: export
-        delegate_to: localhost
+        - name: Save configuration locally
+          copy:
+            content: "{{ export.stdout }}"
+            dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
+          delegate_to: localhost
 
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-        when: export is defined
-        delegate_to: localhost
-
-    - name: Run backup withot password (when password is not defined)
+    - name: Backup configuration (passwordless authentication)
       when: ansible_ssh_pass is not defined
       block:
+        - name: Gather configuration without password
+          shell: >
+            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
+            {{ ansible_user }}@{{ inventory_hostname }}
+            "display current-configuration"
+          register: export
+          delegate_to: localhost
 
-      - name: gather export (with passwordless authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "display current configuration"
-        register: export
-        delegate_to: localhost
-
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
-        when: export is defined
-        delegate_to: localhost
+        - name: Save configuration locally
+          copy:
+            content: "{{ export.stdout }}"
+            dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
+          delegate_to: localhost
