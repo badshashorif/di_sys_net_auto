@@ -33,7 +33,7 @@
       ansible.netcommon.cli_command:
         command: |
           system-view
-          screen-length 0 temporary
+          screen-width 60
       register: cli_output
 
     - name: Copy the configuration file of each Huawei switch to a .cfg file
