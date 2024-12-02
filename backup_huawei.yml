@@ -31,8 +31,7 @@
   tasks:
     - name: Execute display configuration command
       ansible.netcommon.cli_command:
-        commands:
-          - display current-configuration
+        command: display current-configuration
       register: config_output
 
     - name: Save configuration to file
