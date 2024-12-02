@@ -1,45 +1,35 @@
-# Playbook to backup Huawei switch configurations
-
-- name: Collect date and create backup directory
+---
+# BACKUP HUAWEI SWITCHES by João Vitor Costa Medeiros
+# Task to create a directory "Switches" with the path "C:/bkp_year-month-day/Switches/" (Feel free to edit)
+- hosts: localhost
   gather_facts: false
+
   tasks:
-    - name: Collect today's date
-      set_fact:
-        DTG: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
+    - name: Collect Year, Month and Day.
+      setup:
+        filter: "ansible_date_time"
+        gather_subset: "!all"
     
-    - name: Create backup directory
+    - name: Put today's date in a variable.
+      set_fact:
+        DTG: "{{ ansible_date_time.date }}"
+
+    - name: Create directory with the following path C:\bkp_"year-month-day"\Switches\
       file:
         path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
         state: directory
+  run_once: true
 
-- name: Backup Huawei switch configuration
-  hosts: HUAWEI
+# Task to backup Huawei Switch Config File and save it in the path "C:/bkp_year-month-day/Switch/hostname.cfg"
+# Remember to change or maintain the same path in both tasks.
+
+- hosts: HUAWEI
   gather_facts: false
+
   tasks:
-    - name: Set SSH port (set default to 22 if port is not defined)
-      set_fact:
-        ansible_port: "{{ ansible_port | default(22) }}"
-
-    - name: Ensure sshpass is installed (if using password-based auth)
-      when: ansible_ssh_pass is defined
-      block:
-        - name: Check if sshpass is installed
-          ansible.builtin.command: "whereis sshpass | awk '{print $2}'"
-          register: sshpass
-          run_once: yes
-          delegate_to: localhost
-
-        - name: Fail if sshpass is not installed
-          ansible.builtin.fail:
-            msg: >-
-              Playbook requires sshpass to use password authentication. Please install
-              sshpass and re-run the playbook.
-              See https://www.redhat.com/sysadmin/ssh-automation-sshpass for details.
-          when: sshpass.stdout | length == 0
-
-    - name: Backup configuration file
+    - name: Copy the configuration file of each HUAWEI S5700/S5720 Switch and put it in a .cfg file.
       ce_config:
         backup: yes
         backup_options:
           filename: "{{ inventory_hostname }}.cfg"
-          dir_path: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/"
+          dir_path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
