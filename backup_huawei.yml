@@ -4,6 +4,7 @@
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/HUAWEI"
+    spacebar_repeat: 50  # Adjust this number based on the output size
 
   tasks:
     - name: Ensure sshpass is installed (only for password-based authentication)
@@ -22,12 +23,10 @@
 
     - name: Collect configuration using SSH (with password-based authentication)
       block:
-        - name: Execute display current configuration command
-          shell: >
-            sshpass -p '{{ ansible_ssh_pass }}'
-            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
-            {{ ansible_user }}@{{ inventory_hostname }}
-            "display current-configuration                    "  # Added multiple spaces
+        - name: Execute display current configuration command with spacebar simulation
+          shell: |
+            sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} {{ ansible_user }}@{{ inventory_hostname }} "
+            (echo display current-configuration; for i in {1..{{ spacebar_repeat }}}; do echo ''; done)" 
           register: config_output
           delegate_to: localhost
 
@@ -40,11 +39,10 @@
 
     - name: Collect configuration (passwordless authentication)
       block:
-        - name: Execute display current configuration command
-          shell: >
-            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
-            {{ ansible_user }}@{{ inventory_hostname }}
-            "display current-configuration                    "  # Added multiple spaces
+        - name: Execute display current configuration command with spacebar simulation
+          shell: |
+            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} {{ ansible_user }}@{{ inventory_hostname }} "
+            (echo display current-configuration; for i in {1..{{ spacebar_repeat }}}; do echo ''; done)" 
           register: config_output
           delegate_to: localhost
 
