@@ -3,51 +3,32 @@
   hosts: HUAWEI_SW
   gather_facts: no
   vars:
-    backup_dir: "/root/network/backups/HUAWEI"
+    backup_dir: "/root/network/backups/HUAWEI"  # Update this path as needed
 
   tasks:
-    - name: Ensure sshpass is installed (only for password-based authentication)
-      shell: which sshpass
-      register: sshpass_check
+    - name: Ensure backup directory exists
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
       delegate_to: localhost
-      ignore_errors: yes
       run_once: true
 
-    - name: Fail if sshpass is not installed
-      fail:
-        msg: >
-          sshpass is required for password-based SSH authentication.
-          Please install sshpass on the Semaphore host.
-      when: sshpass_check.stdout == ""
+    - name: Collect full configuration using expect
+      expect:
+        command: >
+          sshpass -p '{{ ansible_ssh_pass }}'
+          ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
+          {{ ansible_user }}@{{ inventory_hostname }}
+        responses:
+          '---- More ----': ' '  # Send space to handle pagination
+        timeout: 300  # Adjust based on configuration size
+      register: config_output
+      delegate_to: localhost
 
-    - name: Collect configuration using SSH (with password-based authentication)
-      block:
-        - name: Collect full configuration
-          shell: |
-            sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} -T {{ ansible_user }}@{{ inventory_hostname }} "
-            display current-configuration"
-          register: config_output
-          delegate_to: localhost
-
-        - name: Save configuration to backup directory
-          copy:
-            content: "{{ config_output.stdout }}"
-            dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
-          delegate_to: localhost
-      when: ansible_ssh_pass is defined
-
-    - name: Collect configuration (passwordless authentication)
-      block:
-        - name: Collect full configuration
-          shell: |
-            ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} -T {{ ansible_user }}@{{ inventory_hostname }} "
-            display current-configuration"
-          register: config_output
-          delegate_to: localhost
-
-        - name: Save configuration to backup directory
-          copy:
-            content: "{{ config_output.stdout }}"
-            dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
-          delegate_to: localhost
-      when: ansible_ssh_pass is not defined
+    - name: Save configuration to backup directory
+      copy:
+        content: "{{ config_output.stdout }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
+      delegate_to: localhost
+      run_once: false
