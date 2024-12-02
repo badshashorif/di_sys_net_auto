@@ -30,15 +30,16 @@
   gather_facts: false
   tasks:
     - name: Ensure screen-length is set to 0
-      ansible.builtin.shell: |
-        system-view
-        screen-length 0 temporary
-      register: screen_length_output
+      ansible.netcommon.cli_command:
+        command: |
+          system-view
+          screen-length 0 temporary
+      register: cli_output
 
     - name: Copy the configuration file of each Huawei switch to a .cfg file
       ce_config:
         backup: yes
         backup_options:
           filename: "{{ inventory_hostname }}.cfg"
-          dir_path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
+          dir_path: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/"
 
