@@ -25,23 +25,20 @@
   run_once: true
 
 # Task to back up Huawei switch configurations
-- name: Backup Huawei switch configuration
+- name: Backup Huawei configuration via CLI
   hosts: HUAWEI_SW
   gather_facts: false
   tasks:
-    - name: Ensure screen-length is set to 0
+    - name: Execute display configuration command
       ansible.netcommon.cli_command:
         commands:
-          - system-view
-          - screen-width 60
-      register: cli_output
+          - display current-configuration
+      register: config_output
 
-    - name: Copy the configuration file of each Huawei switch to a .cfg file
-      ce_config:
-        backup: yes
-        backup_options:
-          filename: "{{ inventory_hostname }}.cfg"
-          dir_path: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/"
+    - name: Save configuration to file
+      copy:
+        content: "{{ config_output.stdout }}"
+        dest: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/{{ inventory_hostname }}.cfg"
 
 # Additional steps for environments requiring password authentication
 - name: Ensure sshpass for password-based SSH
