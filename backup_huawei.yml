@@ -1,33 +1,35 @@
 ---
-# BACKUP HUAWEI SWITCHES by João Vitor Costa Medeiros
-# Task to create a directory "Switches" with the path "C:/bkp_year-month-day/Switches/" (Feel free to edit)
-- hosts: localhost
+# BACKUP HUAWEI SWITCHES - Optimized Playbook
+# This playbook creates a directory for backups and saves Huawei switch configurations.
+
+# Task to create a directory for backups
+- name: Collect date and create backup directory
+  hosts: localhost
   gather_facts: false
-
   tasks:
-    - name: Collect Year, Month and Day.
-      setup:
-        filter: "ansible_date_time"
-        gather_subset: "!all"
-    
-    - name: Put today's date in a variable.
+    - name: Collect today's date
       set_fact:
-        DTG: "{{ ansible_date_time.date }}"
+        DTG: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
 
-    - name: Create directory with the following path C:\bkp_"year-month-day"\Switches\
+    - name: Pass DTG to all hosts
+      add_host:
+        name: "{{ item }}"
+        groups: HUAWEI_SW
+        DTG: "{{ DTG }}"
+      with_items: "{{ groups['HUAWEI_SW'] }}"
+
+    - name: Create directory for backups
       file:
         path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
         state: directory
   run_once: true
 
-# Task to backup Huawei Switch Config File and save it in the path "C:/bkp_year-month-day/Switch/hostname.cfg"
-# Remember to change or maintain the same path in both tasks.
-
-- hosts: HUAWEI_SW
+# Task to back up Huawei switch configurations
+- name: Backup Huawei switch configuration
+  hosts: HUAWEI_SW
   gather_facts: false
-
   tasks:
-    - name: Copy the configuration file of each HUAWEI S5700/S5720 Switch and put it in a .cfg file.
+    - name: Copy the configuration file of each Huawei switch to a .cfg file
       ce_config:
         backup: yes
         backup_options:
