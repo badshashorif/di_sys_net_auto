@@ -1,5 +1,5 @@
 ---
-- hosts: ACCESS_RTR
+- hosts: juniper
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/JUNIPER"
