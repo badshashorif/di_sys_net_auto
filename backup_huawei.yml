@@ -20,14 +20,14 @@
           Please install sshpass on the Semaphore host.
       when: sshpass_check.stdout == ""
 
-    - name: Collect configuration using SSH
+    - name: Collect configuration using SSH (with password-based authentication)
       block:
         - name: Execute display current configuration command
           shell: >
             sshpass -p '{{ ansible_ssh_pass }}'
             ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
             {{ ansible_user }}@{{ inventory_hostname }}
-            "display current-configuration"
+            "display current-configuration                    "  # Added multiple spaces
           register: config_output
           delegate_to: localhost
 
@@ -44,7 +44,7 @@
           shell: >
             ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
             {{ ansible_user }}@{{ inventory_hostname }}
-            "display current-configuration"
+            "display current-configuration                    "  # Added multiple spaces
           register: config_output
           delegate_to: localhost
 
