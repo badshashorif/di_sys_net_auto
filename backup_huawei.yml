@@ -14,6 +14,27 @@
         path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
         state: directory
 
+    - name: Set ssh port (set default 22 port when port is not defined)
+      set_fact:
+        ansible_port: "{{ ansible_port | default(22) }}"
+
+    - name: Run backup with password (when password is defined)
+      when: ansible_ssh_pass is defined
+      block:
+
+     - name: Ensure that sshpass is installed
+        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
+        run_once: yes
+        register: sshpass
+        delegate_to: localhost
+
+      - ansible.builtin.fail:
+          msg: >-
+            Playbook requires sshpass to use password authentication. Please install
+            sshpass and re-run the same playbook. 
+            See https://www.redhat.com/sysadmin/ssh-automation-sshpass for details.
+        when: sshpass.stdout|length == 0
+
 - name: Backup Huawei switch configuration
   hosts: HUAWEI
   gather_facts: false
