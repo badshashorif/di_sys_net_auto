@@ -1,5 +1,5 @@
 ---
-- hosts: ACCESS_RTR
+- hosts: Huawei_SW
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/HUAWEI"
