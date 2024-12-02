@@ -1,7 +1,6 @@
 # Playbook to backup Huawei switch configurations
 
 - name: Collect date and create backup directory
-  hosts: localhost
   gather_facts: false
   tasks:
     - name: Collect today's date
