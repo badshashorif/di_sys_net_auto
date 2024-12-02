@@ -16,9 +16,10 @@
 
     - name: Collect full configuration using raw command
       raw: |
-        sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
-        {{ ansible_user }}@{{ inventory_hostname }} "
-        display current-configuration | no-more"
+        sshpass -p '{{ ansible_ssh_pass }}' \
+        ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} \
+        {{ ansible_user }}@{{ inventory_hostname }} \
+        "display current-configuration | no-more"
       register: config_output
       delegate_to: localhost
 
