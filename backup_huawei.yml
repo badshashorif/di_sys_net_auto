@@ -24,27 +24,6 @@
         state: directory
   run_once: true
 
-    - name: Set ssh port (set defualt 22 port when port is not defined)
-      set_fact:
-        ansible_port: "{{ ansible_port | default(22) }}"
-
-    - name: Run backup with password (when password is defined)
-      when: ansible_ssh_pass is defined
-      block:
-
-      - name: Ensure that sshpass is installed
-        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
-        run_once: yes
-        register: sshpass
-        delegate_to: localhost
-
-      - ansible.builtin.fail:
-          msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
-        when: sshpass.stdout|length == 0
-
 # Task to back up Huawei switch configurations
 - name: Backup Huawei switch configuration
   hosts: HUAWEI_SW
@@ -52,9 +31,9 @@
   tasks:
     - name: Ensure screen-length is set to 0
       ansible.netcommon.cli_command:
-        command: |
-          system-view
-          screen-width 60
+        commands:
+          - system-view
+          - screen-width 60
       register: cli_output
 
     - name: Copy the configuration file of each Huawei switch to a .cfg file
@@ -64,3 +43,20 @@
           filename: "{{ inventory_hostname }}.cfg"
           dir_path: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/"
 
+# Additional steps for environments requiring password authentication
+- name: Ensure sshpass for password-based SSH
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Check if sshpass is installed
+      ansible.builtin.shell: whereis sshpass | awk '{print $2}'
+      register: sshpass_check
+      delegate_to: localhost
+      run_once: true
+
+    - name: Fail if sshpass is not installed
+      ansible.builtin.fail:
+        msg: >-
+          sshpass is required for password-based authentication. Please install sshpass
+          and re-run the playbook. See details at https://www.redhat.com/sysadmin/ssh-automation-sshpass
+      when: sshpass_check.stdout | length == 0
