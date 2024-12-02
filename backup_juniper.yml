@@ -1,38 +1,59 @@
 ---
-# BACKUP HUAWEI SWITCHES - Optimized Playbook
-
-- name: Collect date and create backup directory
-  hosts: localhost
-  gather_facts: false
+- hosts: ACCESS_RTR
+  gather_facts: no
+  vars:
+    backup_dir: "/root/network/backups/JUNIPER"
   tasks:
-    - name: Collect today's date
+
+    - name: Set ssh port (set defualt 22 port when port is not defined)
       set_fact:
-        DTG: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
+        ansible_port: "{{ ansible_port | default(22) }}"
 
-    - name: Pass DTG to all hosts
-      add_host:
-        name: "{{ item }}"
-        groups: HUAWEI_SW
-        DTG: "{{ DTG }}"
-      with_items: "{{ groups['HUAWEI_SW'] }}"
+    - name: Run backup with password (when password is defined)
+      when: ansible_ssh_pass is defined
+      block:
 
-    - name: Create directory for backups
-      file:
-        path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
-        state: directory
-  run_once: true
+      - name: Ensure that sshpass is installed
+        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
+        run_once: yes
+        register: sshpass
+        delegate_to: localhost
 
-- name: Backup Huawei configuration via CLI
-  hosts: HUAWEI_SW
-  gather_facts: false
-  tasks:
-    - name: Execute display configuration command
-      ansible.netcommon.cli_command:
-        commands:
-          - display current-configuration
-      register: config_output
+      - ansible.builtin.fail:
+          msg: >-
+            Playbook requrie sshpass to use password authenication, please install
+            sshpass and re-run same playbook again. 
+            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
+        when: sshpass.stdout|length == 0
 
-    - name: Save configuration to file
-      copy:
-        content: "{{ config_output.stdout }}"
-        dest: "/root/network/backups/HUAWEI/bkp_{{ hostvars['localhost']['DTG'] }}/Switches/{{ inventory_hostname }}.cfg"
+      - name: gather export (with password authentication)
+        # shell with delegate_to: localhost works better that ansible.builtin.raw  
+        ansible.builtin.shell: >-
+          sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "show configuration |display set"
+        register: export
+        delegate_to: localhost
+
+      - name: store export to local file
+        ansible.builtin.copy:
+          content: "{{ export.stdout }}"
+          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+        when: export is defined
+        delegate_to: localhost
+
+    - name: Run backup withot password (when password is not defined)
+      when: ansible_ssh_pass is not defined
+      block:
+
+      - name: gather export (with passwordless authentication)
+        # shell with delegate_to: localhost works better that ansible.builtin.raw  
+        ansible.builtin.shell: >-
+          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} "show configuration |display set"
+        register: export
+        delegate_to: localhost
+
+      - name: store export to local file
+        ansible.builtin.copy:
+          content: "{{ export.stdout }}"
+          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+        when: export is defined
+        delegate_to: localhost
