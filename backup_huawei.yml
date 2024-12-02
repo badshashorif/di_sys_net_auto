@@ -1,7 +1,7 @@
 # Playbook to backup Huawei switch configurations
 
 - name: Collect date and create backup directory
-  hosts: HUAWEI
+  hosts: localhost
   gather_facts: false
   tasks:
     - name: Collect today's date
@@ -13,31 +13,31 @@
         path: "/root/network/backups/HUAWEI/bkp_{{ DTG }}/Switches/"
         state: directory
 
+- name: Backup Huawei switch configuration
+  hosts: HUAWEI
+  gather_facts: false
+  tasks:
     - name: Set SSH port (set default to 22 if port is not defined)
       set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
-    - name: Run backup with password (when password is defined)
+    - name: Ensure sshpass is installed (if using password-based auth)
       when: ansible_ssh_pass is defined
       block:
-        - name: Ensure that sshpass is installed
-          ansible.builtin.shell: "whereis sshpass | awk '{print $2}'"
-          run_once: yes
+        - name: Check if sshpass is installed
+          ansible.builtin.command: "whereis sshpass | awk '{print $2}'"
           register: sshpass
+          run_once: yes
           delegate_to: localhost
 
         - name: Fail if sshpass is not installed
           ansible.builtin.fail:
             msg: >-
               Playbook requires sshpass to use password authentication. Please install
-              sshpass and re-run the same playbook.
+              sshpass and re-run the playbook.
               See https://www.redhat.com/sysadmin/ssh-automation-sshpass for details.
-          when: sshpass.stdout|length == 0
+          when: sshpass.stdout | length == 0
 
-- name: Backup Huawei switch configuration
-  hosts: HUAWEI
-  gather_facts: false
-  tasks:
     - name: Backup configuration file
       ce_config:
         backup: yes
