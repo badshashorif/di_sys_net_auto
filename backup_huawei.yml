@@ -4,55 +4,53 @@
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/HUAWEI"
+
   tasks:
-    - name: Ensure SSH port is set
-      set_fact:
-        ansible_port: "{{ ansible_port | default(9337) }}"
+    - name: Ensure sshpass is installed (only for password-based authentication)
+      shell: which sshpass
+      register: sshpass_check
+      delegate_to: localhost
+      ignore_errors: yes
+      run_once: true
 
-    - name: Backup configuration (with password authentication)
-      when: ansible_ssh_pass is defined
+    - name: Fail if sshpass is not installed
+      fail:
+        msg: >
+          sshpass is required for password-based SSH authentication.
+          Please install sshpass on the Semaphore host.
+      when: sshpass_check.stdout == ""
+
+    - name: Collect configuration using SSH
       block:
-        - name: Check if sshpass is installed
-          shell: which sshpass
-          register: sshpass_check
-          delegate_to: localhost
-          run_once: true
-
-        - name: Fail if sshpass is not installed
-          fail:
-            msg: >-
-              sshpass is required for password-based SSH authentication.
-              Please install sshpass on the Semaphore host and rerun the playbook.
-          when: sshpass_check.stdout == ""
-
-        - name: Gather configuration using sshpass
+        - name: Execute display current configuration command
           shell: >
             sshpass -p '{{ ansible_ssh_pass }}'
             ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
             {{ ansible_user }}@{{ inventory_hostname }}
             "display current-configuration"
-          register: export
+          register: config_output
           delegate_to: localhost
 
-        - name: Save configuration locally
+        - name: Save configuration to backup directory
           copy:
-            content: "{{ export.stdout }}"
+            content: "{{ config_output.stdout }}"
             dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
           delegate_to: localhost
+      when: ansible_ssh_pass is defined
 
-    - name: Backup configuration (passwordless authentication)
-      when: ansible_ssh_pass is not defined
+    - name: Collect configuration (passwordless authentication)
       block:
-        - name: Gather configuration without password
+        - name: Execute display current configuration command
           shell: >
             ssh -o StrictHostKeyChecking=no -p {{ ansible_port }}
             {{ ansible_user }}@{{ inventory_hostname }}
             "display current-configuration"
-          register: export
+          register: config_output
           delegate_to: localhost
 
-        - name: Save configuration locally
+        - name: Save configuration to backup directory
           copy:
-            content: "{{ export.stdout }}"
+            content: "{{ config_output.stdout }}"
             dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
           delegate_to: localhost
+      when: ansible_ssh_pass is not defined
