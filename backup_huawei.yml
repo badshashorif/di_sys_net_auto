@@ -56,3 +56,15 @@
           sshpass is required for password-based authentication. Please install sshpass
           and re-run the playbook. See details at https://www.redhat.com/sysadmin/ssh-automation-sshpass
       when: sshpass_check.stdout | length == 0
+
+- name: Add host to known_hosts
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Add host key for Huawei switch
+      known_hosts:
+        path: "~/.ssh/known_hosts"
+        name: "10.91.91.57"
+        port: 9337
+        key: "{{ lookup('pipe', 'ssh-keyscan -p 9337 10.91.91.57') }}"
+
