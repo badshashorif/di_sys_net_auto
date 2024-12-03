@@ -1,5 +1,5 @@
 ---
-- name: Backup Huawei Switch Configurations via SSH
+- name: Backup Huawei S6730 Switch Configurations via SSH
   hosts: HUAWEI_SW
   gather_facts: no
   vars:
@@ -11,8 +11,8 @@
         state: directory
         mode: '0755'
 
-    - name: Collect configuration via SSH
-      huawei.vrp.vrp_command:
+    - name: Collect configuration from Huawei S6730 via SSH
+      huawei.huawei_sdx.sdx_command:
         commands:
           - display current-configuration
       register: config_output
@@ -23,7 +23,7 @@
 
     - name: Save configuration to backup file
       copy:
-        content: "{{ config_output.stdout | join('\n') }}"
+        content: "{{ config_output.stdout }}"
         dest: "{{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
 
     - name: Display success message
