@@ -54,6 +54,6 @@
       - name: store export to local file
         ansible.builtin.copy:
           content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}"
+          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
         when: export is defined
         delegate_to: localhost
