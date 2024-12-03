@@ -1,31 +1,30 @@
 ---
-- name: Backup Huawei Switch Configurations
+- name: Backup Huawei Switch Configurations via SSH
   hosts: all
   gather_facts: no
   vars:
-    backup_directory_path: "/root/network/backups/HUAWEI"  # Define the directory explicitly
+    backup_directory: "{{ backup_directory }}"
   tasks:
     - name: Ensure the backup directory exists
       ansible.builtin.file:
-        path: "{{ backup_directory_path }}"
+        path: "{{ backup_directory }}"
         state: directory
         mode: '0755'
 
-    - name: Fetch configuration from Huawei switches
-      ansible.netcommon.cli_command:
-        command: display current-configuration
-        timeout: 60
-        register: config_output
+    - name: Collect configuration via SSH
+      ansible.builtin.command:
+        cmd: "display current-configuration"
+      register: config_output
 
-    - name: Parse sysname from configuration
+    - name: Extract sysname from configuration
       set_fact:
         sysname: "{{ (config_output.stdout | regex_search('sysname\\s+(\\S+)')).group(1) | default('unknown_' + inventory_hostname) }}"
 
     - name: Save configuration to backup file
       copy:
         content: "{{ config_output.stdout }}"
-        dest: "{{ backup_directory_path }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+        dest: "{{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
 
     - name: Display success message
       debug:
-        msg: "Backup successful for {{ sysname }}. Saved to {{ backup_directory_path }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+        msg: "Backup successful for {{ sysname }}. Configuration saved to {{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
