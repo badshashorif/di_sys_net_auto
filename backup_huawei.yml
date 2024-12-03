@@ -12,8 +12,9 @@
         mode: '0755'
 
     - name: Collect configuration via SSH
-      ansible.builtin.shell: |
-        display current-configuration
+      huawei.vrp.vrp_command:
+        commands:
+          - display current-configuration
       register: config_output
 
     - name: Extract sysname from configuration
@@ -22,7 +23,7 @@
 
     - name: Save configuration to backup file
       copy:
-        content: "{{ config_output.stdout }}"
+        content: "{{ config_output.stdout | join('\n') }}"
         dest: "{{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
 
     - name: Display success message
