@@ -1,22 +1,6 @@
-version: v1.0
-name: Run Huawei Backup Script
-
-agents:
-  - name: python-agent
-    docker:
-      - image: python:3.9 # Or any other appropriate Docker image
-    env_vars:
-      - name: SEMAPHORE_BACKEND
-        value: "GitHub" # Example of an environment variable (optional)
-
-blocks:
-  - name: Run Huawei Backup Script
-    task:
-      jobs:
-        - name: Run Script
-          commands:
-            - checkout
-            - run:
-                name: Execute Python Script
-                command: |
-                  python3 /root/network/pythonproject/script/huawei_backup.py
+---
+- name: Huawei Backup Playbook
+  hosts: localhost
+  tasks:
+    - name: Execute Python Script
+      command: python3 /root/network/pythonproject/script/huawei_backup.py
