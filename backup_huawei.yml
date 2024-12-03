@@ -1,6 +1,6 @@
 ---
 - name: Backup Huawei Switch Configurations via SSH
-  hosts: all
+  hosts: HUAWEI_SW
   gather_facts: no
   vars:
     backup_dir: "{{ hostvars[inventory_hostname]['backup_dir'] }}"
