@@ -3,4 +3,4 @@
   hosts: localhost
   tasks:
     - name: Execute Python Script
-      command: python3 /root/network/pythonproject/script/huawei_backup.py
+      command: /usr/bin/python3 /root/network/pythonproject/script/huawei_backup.py
