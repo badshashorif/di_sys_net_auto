@@ -1,31 +1,22 @@
----
-- name: Backup Huawei S6730 Switch Configurations via SSH
-  hosts: HUAWEI_SW
-  gather_facts: no
-  vars:
-    backup_dir: "{{ hostvars[inventory_hostname]['backup_dir'] }}"
-  tasks:
-    - name: Ensure the backup directory exists
-      ansible.builtin.file:
-        path: "{{ backup_dir }}"
-        state: directory
-        mode: '0755'
+version: v1.0
+name: Run Huawei Backup Script
 
-    - name: Collect configuration from Huawei S6730 via SSH
-      huawei.huawei_sdx.sdx_command:
-        commands:
-          - display current-configuration
-      register: config_output
+agents:
+  - name: python-agent
+    docker:
+      - image: python:3.9 # Or any other appropriate Docker image
+    env_vars:
+      - name: SEMAPHORE_BACKEND
+        value: "GitHub" # Example of an environment variable (optional)
 
-    - name: Extract sysname from configuration
-      set_fact:
-        sysname: "{{ (config_output.stdout | regex_search('sysname\\s+(\\S+)')).group(1) | default('unknown_' + inventory_hostname) }}"
-
-    - name: Save configuration to backup file
-      copy:
-        content: "{{ config_output.stdout }}"
-        dest: "{{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
-
-    - name: Display success message
-      debug:
-        msg: "Backup successful for {{ sysname }}. Configuration saved to {{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+blocks:
+  - name: Run Huawei Backup Script
+    task:
+      jobs:
+        - name: Run Script
+          commands:
+            - checkout
+            - run:
+                name: Execute Python Script
+                command: |
+                  python3 /root/network/pythonproject/script/huawei_backup.py
