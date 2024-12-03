@@ -3,7 +3,7 @@
   hosts: all
   gather_facts: no
   vars:
-    backup_dir: "{{ backup_dir }}"
+    backup_dir: "{{ hostvars[inventory_hostname]['backup_dir'] }}"
   tasks:
     - name: Ensure the backup directory exists
       ansible.builtin.file:
@@ -12,8 +12,8 @@
         mode: '0755'
 
     - name: Collect configuration via SSH
-      ansible.builtin.command:
-        cmd: "display current-configuration"
+      ansible.builtin.shell: |
+        display current-configuration
       register: config_output
 
     - name: Extract sysname from configuration
