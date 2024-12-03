@@ -1,30 +1,31 @@
 ---
-- name: Backup Huawei Switch Configuration
+- name: Backup Huawei Switch Configurations
   hosts: HUAWEI_SW
   gather_facts: no
   vars:
-    backup_dir: "/root/network/backups/HUAWEI"
-
+    backup_directory: "{{ backup_directory | default('/root/network/backups/HUAWEI') }}"
   tasks:
-    - name: Ensure backup directory exists
-      file:
-        path: "{{ backup_dir }}"
+    - name: Ensure the backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_directory }}"
         state: directory
         mode: '0755'
-      delegate_to: localhost
-      run_once: true
 
-    - name: Collect full configuration using raw command
-      raw: |
-        sshpass -p '{{ ansible_ssh_pass }}' \
-        ssh -o StrictHostKeyChecking=no -p {{ ansible_port }} \
-        {{ ansible_user }}@{{ inventory_hostname }} \
-        "display current-configuration | no-more"
-      register: config_output
-      delegate_to: localhost
+    - name: Fetch configuration from Huawei switches
+      ansible.netcommon.cli_command:
+        command: display current-configuration
+        timeout: 60
+        register: config_output
 
-    - name: Save configuration to backup directory
+    - name: Parse sysname from configuration
+      set_fact:
+        sysname: "{{ (config_output.stdout | regex_search('sysname\\s+(\\S+)')).group(1) | default('unknown_' + inventory_hostname) }}"
+
+    - name: Save configuration to backup file
       copy:
         content: "{{ config_output.stdout }}"
-        dest: "{{ backup_dir }}/{{ inventory_hostname }}_config_{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}.cfg"
-      delegate_to: localhost
+        dest: "{{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+
+    - name: Display success message
+      debug:
+        msg: "Backup successful for {{ sysname }}. Saved to {{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
