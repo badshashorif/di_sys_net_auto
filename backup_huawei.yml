@@ -2,5 +2,9 @@
 - name: Huawei Backup Playbook
   hosts: localhost
   tasks:
-    - name: Execute Python Script
-      command: /usr/bin/python3 /root/network/pythonproject/script/huawei_backup.py
+    - name: Activate virtual environment and execute Python script
+      shell: |
+        source /root/network/pythonproject/env/bin/activate
+        python3 /root/network/pythonproject/script/huawei_backup.py
+      args:
+        executable: /bin/bash
