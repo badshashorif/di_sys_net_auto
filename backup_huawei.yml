@@ -3,11 +3,11 @@
   hosts: all
   gather_facts: no
   vars:
-    backup_directory: "{{ backup_directory }}"
+    backup_dir: "{{ backup_dir }}"
   tasks:
     - name: Ensure the backup directory exists
       ansible.builtin.file:
-        path: "{{ backup_directory }}"
+        path: "{{ backup_dir }}"
         state: directory
         mode: '0755'
 
@@ -23,8 +23,8 @@
     - name: Save configuration to backup file
       copy:
         content: "{{ config_output.stdout }}"
-        dest: "{{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+        dest: "{{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
 
     - name: Display success message
       debug:
-        msg: "Backup successful for {{ sysname }}. Configuration saved to {{ backup_directory }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
+        msg: "Backup successful for {{ sysname }}. Configuration saved to {{ backup_dir }}/{{ sysname }}_{{ ansible_date_time.iso8601_basic }}.txt"
