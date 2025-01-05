@@ -17,12 +17,14 @@
           Please install it and re-run the playbook.
       when: telnet_check.stdout | length == 0
 
-    - name: Collect both command outputs over Telnet
+    - name: Collect both command outputs over Telnet with "enable"
       ansible.builtin.shell: >-
         (
         echo '{{ ansible_user }}'; 
         sleep 1; 
         echo '{{ ansible_ssh_pass }}'; 
+        sleep 1; 
+        echo "enable"; 
         sleep 1; 
         echo "show interface brief"; 
         sleep 1; 
