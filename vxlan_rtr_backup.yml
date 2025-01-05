@@ -1,5 +1,5 @@
 ---
-- hosts: ACCESS_RTR
+- hosts: VXLAN_RTR
   gather_facts: no
   vars:
     backup_dir: "/root/network/backups/VXLAN_RTR"
