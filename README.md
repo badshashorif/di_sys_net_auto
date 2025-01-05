@@ -32,7 +32,7 @@ Network automation simplifies complex workflows, reduces human errors, and impro
 1. **Clone the Repository:**  
    ```bash  
    git clone https://github.com/badshashorif/di_sys_net_auto.git  
-   cd network-automation  
+   cd di_sys_net_auto  
    ```  
 2. **Install Dependencies:**  
    - Ensure Python, Ansible, and other required tools are installed.  
