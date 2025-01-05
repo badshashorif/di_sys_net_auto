@@ -17,7 +17,7 @@
           Please install it and re-run the playbook.
       when: telnet_check.stdout | length == 0
 
-    - name: Collect both command outputs over Telnet with "enable"
+    - name: Collect full output of both commands over Telnet
       ansible.builtin.shell: >-
         (
         echo '{{ ansible_user }}'; 
@@ -26,18 +26,20 @@
         sleep 1; 
         echo "enable"; 
         sleep 1; 
-        echo "show interface brief"; 
+        echo "terminal length 0"; 
         sleep 1; 
-        echo "show configuration"; 
+        echo "show interface brief"; 
         sleep 2; 
+        echo "show configuration"; 
+        sleep 5; 
         echo "exit"
         ) | telnet {{ inventory_hostname }} {{ ansible_port | default(23) }}
       register: combined_output
       delegate_to: localhost
 
-    - name: Store combined output to a local file
+    - name: Store full output to a local file
       ansible.builtin.copy:
         content: "{{ combined_output.stdout }}"
-        dest: "{{ backup_dir }}/{{ inventory_hostname }}_combined_output_{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_full_output_{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
       when: combined_output is defined
       delegate_to: localhost
