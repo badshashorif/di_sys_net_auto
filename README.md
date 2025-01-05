@@ -31,7 +31,7 @@ Network automation simplifies complex workflows, reduces human errors, and impro
 ## Getting Started  
 1. **Clone the Repository:**  
    ```bash  
-   git clone https://github.com/yourusername/network-automation.git  
+   git clone https://github.com/badshashorif/di_sys_net_auto.git  
    cd network-automation  
    ```  
 2. **Install Dependencies:**  
@@ -59,5 +59,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 Special thanks to the Dot Internet team for their continuous support and innovation in network solutions.  
 
 ## Contact  
-For questions, suggestions, or issues, feel free to reach out via [your.email@example.com](mailto:your.email@example.com).  
+For questions, suggestions, or issues, feel free to reach out via [badshashorif@dotinternet.com.bd](mailto:your.email@example.com).  
 
