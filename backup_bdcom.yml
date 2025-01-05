@@ -5,70 +5,37 @@
     backup_dir: "/root/network/backups/BDCOM"
   tasks:
 
-    - name: Set Telnet port (default to 23 if not defined)
-      set_fact:
-        ansible_port: "{{ ansible_port | default(23) }}"
+    - name: Ensure Telnet client is available
+      ansible.builtin.shell: whereis telnet | awk '{print $2}'
+      run_once: yes
+      register: telnet_check
+      delegate_to: localhost
 
-    - name: Run backup with password (when password is defined)
-      when: ansible_ssh_pass is defined
-      block:
+    - ansible.builtin.fail:
+        msg: >-
+          Telnet client is not installed on the control node.
+          Please install it and re-run the playbook.
+      when: telnet_check.stdout | length == 0
 
-        - name: Ensure that telnet is installed
-          ansible.builtin.shell: whereis telnet | awk '{print $2}'
-          run_once: yes
-          register: telnet_check
-          delegate_to: localhost
+    - name: Collect both command outputs over Telnet
+      ansible.builtin.shell: >-
+        (
+        echo '{{ ansible_user }}'; 
+        sleep 1; 
+        echo '{{ ansible_ssh_pass }}'; 
+        sleep 1; 
+        echo "show interface brief"; 
+        sleep 1; 
+        echo "show configuration"; 
+        sleep 2; 
+        echo "exit"
+        ) | telnet {{ inventory_hostname }} {{ ansible_port | default(23) }}
+      register: combined_output
+      delegate_to: localhost
 
-        - ansible.builtin.fail:
-            msg: >-
-              Playbook requires Telnet to be installed for authentication. Please install Telnet and re-run
-              the playbook. Refer to your system documentation for installation details.
-          when: telnet_check.stdout | length == 0
-
-        - name: Gather both command outputs (with password authentication)
-          ansible.builtin.shell: >-
-            (
-            echo '{{ ansible_user }}'; 
-            sleep 1; 
-            echo '{{ ansible_ssh_pass }}'; 
-            sleep 1; 
-            echo "show interface brief"; 
-            sleep 1; 
-            echo "show configuration"; 
-            sleep 2; 
-            echo "exit"
-            ) | telnet {{ inventory_hostname }} {{ ansible_port }}
-          register: combined_output
-          delegate_to: localhost
-
-        - name: Store combined output to local file
-          ansible.builtin.copy:
-            content: "{{ combined_output.stdout }}"
-            dest: "{{ backup_dir }}/{{ inventory_hostname }}_combined_output.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-          when: combined_output is defined
-          delegate_to: localhost
-
-    - name: Run backup without password (when password is not defined)
-      when: ansible_ssh_pass is not defined
-      block:
-
-        - name: Gather both command outputs (passwordless authentication)
-          ansible.builtin.shell: >-
-            (
-            echo '{{ ansible_user }}'; 
-            sleep 1; 
-            echo "show interface brief"; 
-            sleep 1; 
-            echo "show configuration"; 
-            sleep 2; 
-            echo "exit"
-            ) | telnet {{ inventory_hostname }} {{ ansible_port }}
-          register: combined_output
-          delegate_to: localhost
-
-        - name: Store combined output to local file
-          ansible.builtin.copy:
-            content: "{{ combined_output.stdout }}"
-            dest: "{{ backup_dir }}/{{ inventory_hostname }}_combined_output.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-          when: combined_output is defined
-          delegate_to: localhost
+    - name: Store combined output to a local file
+      ansible.builtin.copy:
+        content: "{{ combined_output.stdout }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_combined_output_{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
+      when: combined_output is defined
+      delegate_to: localhost
