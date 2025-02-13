@@ -29,7 +29,7 @@
       - name: Gather configuration and interface descriptions (with password authentication)
         ansible.builtin.shell: >-
           sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} \
-          "show configuration | display set; echo '-----'; show interfaces descriptions"
+          "show interfaces descriptions; echo '-----'; show configuration | display set"
         register: export
         delegate_to: localhost
 
