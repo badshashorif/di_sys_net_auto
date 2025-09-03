@@ -71,45 +71,41 @@
       changed_when: true
 
     - name: Create full binary backup (.backup) on router
-      # চাইলে dont-encrypt=yes এর বদলে password=YOUR_PASS ব্যবহার করতে পারেন
       ansible.builtin.raw: /system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes
       changed_when: true
 
-    # ---------- Fetch to controller ----------
+    # ---------- Fetch ----------
     - name: Fetch config export (.rsc)
       ansible.builtin.fetch:
         src: "/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc"
         dest: "{{ backup_base_dir }}/{{ inventory_hostname }}/"
         flat: yes
-        fail_on_missing: yes
 
     - name: Fetch scripts export (.rsc)
       ansible.builtin.fetch:
         src: "/{{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc"
         dest: "{{ backup_base_dir }}/{{ inventory_hostname }}/"
         flat: yes
-        fail_on_missing: yes
 
     - name: Fetch scheduler export (.rsc)
       ansible.builtin.fetch:
         src: "/{{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc"
         dest: "{{ backup_base_dir }}/{{ inventory_hostname }}/"
         flat: yes
-        fail_on_missing: yes
 
     - name: Fetch full binary backup (.backup)
       ansible.builtin.fetch:
         src: "/{{ inventory_hostname }}_full_{{ backup_ts }}.backup"
         dest: "{{ backup_base_dir }}/{{ inventory_hostname }}/"
         flat: yes
-        fail_on_missing: yes
 
-    # ---------- Cleanup router temp files ----------
-    - name: Cleanup exported files from router storage
+    # ---------- Cleanup ----------
+    - name: Cleanup router temporary files
       ansible.builtin.raw: >
         /file remove [find name~"^{{ inventory_hostname }}_(config|scripts|scheduler)_{{ backup_ts }}\.rsc$"];
         /file remove [find name~"^{{ inventory_hostname }}_full_{{ backup_ts }}\.backup$"]
       changed_when: true
+
 
     # ---------- Retention (local) ----------
     - name: Retain only last N config exports (local)
