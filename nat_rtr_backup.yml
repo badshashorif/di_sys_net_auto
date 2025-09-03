@@ -1,59 +1,72 @@
 ---
-- hosts: NAT_RTR
+- name: MikroTik full + script backup (SSH, no python on device)
+  hosts: NAT_RTR
   gather_facts: no
   vars:
-    backup_dir: "/root/network/backups/NAT_RTR"
-  tasks:
+    backup_dir: "/root/network/backups/NAT_RTR"     # local path on your Ansible controller
+  pre_tasks:
+    - name: Ensure local backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0750"
+      delegate_to: localhost
+      run_once: true
 
-    - name: Set ssh port (set defualt 22 port when port is not defined)
-      set_fact:
+    - name: Set backup timestamp (controller side)
+      ansible.builtin.set_fact:
+        backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
+
+    - name: Ensure SSH port is defined (default 22)
+      ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
-    - name: Run backup with password (when password is defined)
-      when: ansible_ssh_pass is defined
-      block:
+  tasks:
+    - name: Export running configuration to file (.rsc)
+      ansible.builtin.raw: /export file={{ inventory_hostname }}_config_{{ backup_ts }}
+      changed_when: true
 
-      - name: Ensure that sshpass is installed
-        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
-        run_once: yes
-        register: sshpass
-        delegate_to: localhost
+    - name: Export all scripts to file (.rsc)
+      ansible.builtin.raw: /system script export file={{ inventory_hostname }}_scripts_{{ backup_ts }}
+      changed_when: true
 
-      - ansible.builtin.fail:
-          msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
-        when: sshpass.stdout|length == 0
+    - name: Export scheduler to file (.rsc)  # optional but useful for restores
+      ansible.builtin.raw: /system scheduler export file={{ inventory_hostname }}_scheduler_{{ backup_ts }}
+      changed_when: true
 
-      - name: gather export (with password authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} /export
-        register: export
-        delegate_to: localhost
+    - name: Create full binary backup (.backup) (not encrypted)
+      ansible.builtin.raw: /system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes
+      changed_when: true
 
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-        when: export is defined
-        delegate_to: localhost
+    - name: Fetch config export (.rsc) to controller
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc"
+        dest: "{{ backup_dir }}/"
+        flat: yes
+        fail_on_missing: yes
 
-    - name: Run backup withot password (when password is not defined)
-      when: ansible_ssh_pass is not defined
-      block:
+    - name: Fetch scripts export (.rsc) to controller
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc"
+        dest: "{{ backup_dir }}/"
+        flat: yes
+        fail_on_missing: yes
 
-      - name: gather export (with passwordless authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} /export
-        register: export
-        delegate_to: localhost
+    - name: Fetch scheduler export (.rsc) to controller
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc"
+        dest: "{{ backup_dir }}/"
+        flat: yes
+        fail_on_missing: yes
 
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-        when: export is defined
-        delegate_to: localhost
+    - name: Fetch full binary backup (.backup) to controller
+      ansible.builtin.fetch:
+        src: "/{{ inventory_hostname }}_full_{{ backup_ts }}.backup"
+        dest: "{{ backup_dir }}/"
+        flat: yes
+        fail_on_missing: yes
+
+    - name: Cleanup files from router (keep storage clean)
+      ansible.builtin.raw: >
+        /file remove [find name~"^{{ inventory_hostname }}_(config|scripts|scheduler|full)_{{ backup_ts }}\.(rsc|backup)$"]
+      changed_when: true
