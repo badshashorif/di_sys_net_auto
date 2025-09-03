@@ -36,8 +36,8 @@
       register: sshpass_path
       changed_when: false
       ansible.builtin.shell: |
-        set -o pipefail
         command -v sshpass || true
+
 
     - name: Install sshpass on Debian/Ubuntu (local)
       when:
