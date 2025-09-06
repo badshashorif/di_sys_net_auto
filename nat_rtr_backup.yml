@@ -25,7 +25,7 @@
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
-    # ----- sshpass handling (password auth হলে) -----
+    # ----- sshpass handling (only if password auth) -----
     - name: Gather localhost facts to detect package manager
       when: ansible_ssh_pass is defined
       delegate_to: localhost
@@ -153,42 +153,40 @@
         {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
-    # ---------- Cleanup on router (exact filenames; non-fatal) ----------
-- name: Cleanup config .rsc from router (key auth)
-  delegate_to: localhost
-  when: ansible_ssh_pass is not defined
-  ansible.builtin.shell: >
-    ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
-    "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\""
-  changed_when: true
+    # ---------- Cleanup on router (each as separate command; non-fatal) ----------
+    - name: Cleanup config .rsc from router (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
+      changed_when: true
 
-- name: Cleanup full .backup from router (key auth)
-  delegate_to: localhost
-  when: ansible_ssh_pass is not defined
-  ansible.builtin.shell: >
-    ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
-    "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\""
-  changed_when: true
+    - name: Cleanup full .backup from router (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
+      changed_when: true
 
+    - name: Cleanup config .rsc from router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ansible_user }}@{{ inventory_hostname }}
+        "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
+      changed_when: true
 
-- name: Cleanup config .rsc from router (password auth)
-  delegate_to: localhost
-  when: ansible_ssh_pass is defined
-  ansible.builtin.shell: >
-    sshpass -p '{{ ansible_ssh_pass }}'
-    ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
-    "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\""
-  changed_when: true
-
-- name: Cleanup full .backup from router (password auth)
-  delegate_to: localhost
-  when: ansible_ssh_pass is defined
-  ansible.builtin.shell: >
-    sshpass -p '{{ ansible_ssh_pass }}'
-    ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
-    "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\""
-  changed_when: true
-
+    - name: Cleanup full .backup from router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ansible_user }}@{{ inventory_hostname }}
+        "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
+      changed_when: true
 
     # ---------- Retention (local) ----------
     - name: Retain only last N files (local)
