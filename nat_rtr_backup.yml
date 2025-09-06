@@ -4,7 +4,7 @@
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups/NAT_RTR"  # local (Semaphore/controller)
+    backup_base_dir: "/root/network/backups"
     retention_keep: 10
     ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
@@ -47,6 +47,7 @@
           (command -v yum && yum install -y sshpass || dnf install -y sshpass)
         else
           echo "Please install sshpass manually" >&2; exit 1
+        fi
 
   tasks:
     # ---------- Export on router (run via localhost ssh) ----------
@@ -195,18 +196,15 @@
         {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
-    # ---------- Cleanup on router (exact filenames; non-fatal) ----------
-    - name: Cleanup temp files on router (no password)
+    # ---------- Cleanup on router ----------
+    - name: Cleanup temp files on router
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
         ssh -p {{ ansible_port }} {{ ssh_args_common }}
         {{ ansible_user }}@{{ inventory_hostname }}
-        "/file remove {{ inventory_hostname }}_config_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_full_{{ backup_ts }}.backup" || true
-      changed_when: true
+        "/file remove [find name~'^{{ inventory_hostname }}_(config|scripts|scheduler)_{{ backup_ts }}\\.rsc$'];
+         /file remove [find name~'^{{ inventory_hostname }}_full_{{ backup_ts }}\\.backup$']"
 
     - name: Cleanup temp files on router (password auth)
       delegate_to: localhost
@@ -215,13 +213,10 @@
         sshpass -p '{{ ansible_ssh_pass }}'
         ssh -p {{ ansible_port }} {{ ssh_args_common }}
         {{ ansible_user }}@{{ inventory_hostname }}
-        "/file remove {{ inventory_hostname }}_config_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc;
-         /file remove {{ inventory_hostname }}_full_{{ backup_ts }}.backup" || true
-      changed_when: true
+        "/file remove [find name~'^{{ inventory_hostname }}_(config|scripts|scheduler)_{{ backup_ts }}\\.rsc$'];
+         /file remove [find name~'^{{ inventory_hostname }}_full_{{ backup_ts }}\\.backup$']"
 
-    # ---------- Retention (local) ----------
+    # ---------- Retention ----------
     - name: Retain only last N files (local)
       delegate_to: localhost
       changed_when: false
