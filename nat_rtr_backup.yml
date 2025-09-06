@@ -25,29 +25,64 @@
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
-    # password auth হলে sshpass দরকার কিনা দেখে নিন
-    - name: Check if sshpass exists (local) when password is used
+    # ----- sshpass handling (password auth হলে) -----
+    - name: Gather localhost facts to detect package manager
       when: ansible_ssh_pass is defined
       delegate_to: localhost
-      register: sshpass_path
-      changed_when: false
-      failed_when: false
-      ansible.builtin.command: command -v sshpass
+      run_once: true
+      ansible.builtin.setup:
 
-    - name: Install sshpass (local) if missing
+    - name: Record local package manager
+      when: ansible_ssh_pass is defined
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.set_fact:
+        local_pkg_mgr: "{{ ansible_facts.pkg_mgr | default(ansible_facts.ansible_pkg_mgr | default('unknown')) }}"
+
+    - name: Install sshpass via APT (Debian/Ubuntu)
       when:
         - ansible_ssh_pass is defined
-        - (sshpass_path.rc is defined) and (sshpass_path.rc != 0)
+        - local_pkg_mgr in ['apt', 'apt-get']
       delegate_to: localhost
+      run_once: true
       become: yes
-      ansible.builtin.shell: |
-        if command -v apt-get >/dev/null 2>&1; then
-          apt-get update -y && apt-get install -y sshpass
-        elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
-          (command -v yum && yum install -y epel-release || dnf install -y epel-release) || true
-          (command -v yum && yum install -y sshpass || dnf install -y sshpass)
-        else
-          echo "Please install sshpass manually" >&2; exit 1
+      ansible.builtin.apt:
+        name: sshpass
+        state: present
+        update_cache: yes
+
+    - name: Enable EPEL (RHEL/CentOS) if needed
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'yum'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+
+    - name: Install sshpass via YUM (RHEL/CentOS)
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'yum'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.yum:
+        name: sshpass
+        state: present
+
+    - name: Install sshpass via DNF (Fedora/Rocky/Alma modern)
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'dnf'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.dnf:
+        name: sshpass
+        state: present
 
   tasks:
     # ---------- Export on router (ONE-LINE) ----------
