@@ -1,10 +1,10 @@
 ---
-- name: MikroTik full + script backup (Semaphore-safe via localhost SSH)
+- name: MikroTik minimal backup (.backup + single .rsc)
   hosts: NAT_RTR
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups/NAT_RTR"
+    backup_base_dir: "/root/network/backups/NAT_RTR"   # local (Semaphore/controller)
     retention_keep: 10
     ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
@@ -47,182 +47,52 @@
           (command -v yum && yum install -y sshpass || dnf install -y sshpass)
         else
           echo "Please install sshpass manually" >&2; exit 1
-        fi
 
   tasks:
-    # ---------- Export on router (run via localhost ssh) ----------
-    - name: Export config (.rsc) on router
+    # ---------- Export on router (ONE-LINE commands) ----------
+    - name: Export single config (.rsc) on router
       delegate_to: localhost
-      when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ 'sshpass -p \'' + ansible_ssh_pass + '\' ' if ansible_ssh_pass is defined else '' }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
         "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
-      changed_when: true
-
-    - name: Export config (.rsc) on router (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
-      changed_when: true
-
-    - name: Export scripts (.rsc) on router
-      delegate_to: localhost
-      when: ansible_ssh_pass is not defined
-      ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/system script export file={{ inventory_hostname }}_scripts_{{ backup_ts }}"
-      changed_when: true
-
-    - name: Export scripts (.rsc) on router (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/system script export file={{ inventory_hostname }}_scripts_{{ backup_ts }}"
-      changed_when: true
-
-    - name: Export scheduler (.rsc) on router
-      delegate_to: localhost
-      when: ansible_ssh_pass is not defined
-      ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/system scheduler export file={{ inventory_hostname }}_scheduler_{{ backup_ts }}"
-      changed_when: true
-
-    - name: Export scheduler (.rsc) on router (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/system scheduler export file={{ inventory_hostname }}_scheduler_{{ backup_ts }}"
       changed_when: true
 
     - name: Create full binary backup (.backup) on router
       delegate_to: localhost
-      when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ 'sshpass -p \'' + ansible_ssh_pass + '\' ' if ansible_ssh_pass is defined else '' }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
         "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
       changed_when: true
 
-    - name: Create full binary backup (.backup) on router (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
-      changed_when: true
-
-    # ---------- Copy back (scp) ----------
+    # ---------- Copy back ----------
     - name: Copy config export to controller
       delegate_to: localhost
-      when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
+        {{ 'sshpass -p \'' + ansible_ssh_pass + '\' ' if ansible_ssh_pass is defined else '' }}
         scp -P {{ ansible_port }} {{ ssh_args_common }}
         {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    - name: Copy config export to controller (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    - name: Copy scripts export to controller
-      delegate_to: localhost
-      when: ansible_ssh_pass is not defined
-      ansible.builtin.shell: >
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    - name: Copy scripts export to controller (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    - name: Copy scheduler export to controller
-      delegate_to: localhost
-      when: ansible_ssh_pass is not defined
-      ansible.builtin.shell: >
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    - name: Copy scheduler export to controller (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
     - name: Copy full binary backup to controller
       delegate_to: localhost
-      when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
+        {{ 'sshpass -p \'' + ansible_ssh_pass + '\' ' if ansible_ssh_pass is defined else '' }}
         scp -P {{ ansible_port }} {{ ssh_args_common }}
         {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
-    - name: Copy full binary backup to controller (password auth)
+    # ---------- Cleanup on router (ONE-LINE; no newline inside quotes) ----------
+    - name: Cleanup temp files on router (exact filenames; non-fatal)
       delegate_to: localhost
-      when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
-        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
-
-    # ---------- Cleanup on router ----------
-    - name: Cleanup temp files on router
-      delegate_to: localhost
-      when: ansible_ssh_pass is not defined
-      ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/file remove {{ inventory_hostname }}_config_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_full_{{ backup_ts }}.backup" || true
+        {{ 'sshpass -p \'' + ansible_ssh_pass + '\' ' if ansible_ssh_pass is defined else '' }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        "/file remove {{ inventory_hostname }}_config_{{ backup_ts }}.rsc; /file remove {{ inventory_hostname }}_full_{{ backup_ts }}.backup" || true
       changed_when: true
 
-    - name: Cleanup temp files on router (password auth)
-      delegate_to: localhost
-      when: ansible_ssh_pass is defined
-      ansible.builtin.shell: >
-        sshpass -p '{{ ansible_ssh_pass }}'
-        ssh -p {{ ansible_port }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-        {{ ansible_user }}@{{ inventory_hostname }}
-        "/file remove {{ inventory_hostname }}_config_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_scripts_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_scheduler_{{ backup_ts }}.rsc;
-        /file remove {{ inventory_hostname }}_full_{{ backup_ts }}.backup" || true
-      changed_when: true
-
-    # ---------- Retention ----------
+    # ---------- Retention (local) ----------
     - name: Retain only last N files (local)
       delegate_to: localhost
       changed_when: false
@@ -230,7 +100,5 @@
         keep: "{{ retention_keep }}"
         base: "{{ backup_base_dir }}/{{ inventory_hostname }}"
       ansible.builtin.shell: |
-        for t in config scripts scheduler; do
-          ls -1t "{{ base }}/{{ inventory_hostname }}_${t}_*.rsc" 2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
-        done
-        ls -1t "{{ base }}/{{ inventory_hostname }}_full_*.backup" 2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
+        ls -1t "{{ base }}/{{ inventory_hostname }}_config_*.rsc"    2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
+        ls -1t "{{ base }}/{{ inventory_hostname }}_full_*.backup"   2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
