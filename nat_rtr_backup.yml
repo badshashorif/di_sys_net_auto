@@ -4,7 +4,7 @@
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups"
+    backup_base_dir: "/root/network/backups/NAT_RTR"
     retention_keep: 10
     ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
