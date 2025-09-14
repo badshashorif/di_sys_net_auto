@@ -4,7 +4,7 @@
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups/ACCESS_RTR"   # local (Semaphore/controller)
+    backup_base_dir: "/root/network/backups/ACCESS_RTR"
     retention_keep: 10
     ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
@@ -25,8 +25,14 @@
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(22) }}"
 
+    # ---- universal SSH facts (fix for undefined ansible_user / ansible_host)
+    - name: Derive SSH user and target host
+      ansible.builtin.set_fact:
+        ssh_user:  "{{ ansible_user | default(ansible_ssh_user | default('admin')) }}"
+        ssh_target: "{{ ansible_host | default(inventory_hostname) }}"
+
     # ----- sshpass handling (only if password auth) -----
-    - name: Gather localhost facts to detect package manager
+    - name: Gather localhost facts (for pkg mgr)
       when: ansible_ssh_pass is defined
       delegate_to: localhost
       run_once: true
@@ -73,7 +79,7 @@
         name: sshpass
         state: present
 
-    - name: Install sshpass via DNF (Fedora/Rocky/Alma modern)
+    - name: Install sshpass via DNF (Fedora/Rocky/Alma)
       when:
         - ansible_ssh_pass is defined
         - local_pkg_mgr == 'dnf'
@@ -90,7 +96,7 @@
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
         "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
       changed_when: true
 
@@ -99,7 +105,7 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ ssh_user }}@{{ ssh_target }}
         "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
       changed_when: true
 
@@ -107,7 +113,7 @@
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
         "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
       changed_when: true
 
@@ -116,7 +122,7 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ ssh_user }}@{{ ssh_target }}
         "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
       changed_when: true
 
@@ -126,7 +132,7 @@
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
         scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
     - name: Copy config export to controller (password auth)
@@ -134,7 +140,7 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
     - name: Copy full binary backup to controller (key auth)
@@ -142,7 +148,7 @@
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
         scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
     - name: Copy full binary backup to controller (password auth)
@@ -150,15 +156,15 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' scp -P {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
-    # ---------- Cleanup on router (each as separate command; non-fatal) ----------
+    # ---------- Cleanup on router (non-fatal) ----------
     - name: Cleanup config .rsc from router (key auth)
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
         "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
       changed_when: true
 
@@ -166,7 +172,7 @@
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
-        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ansible_user }}@{{ inventory_hostname }}
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
         "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
       changed_when: true
 
@@ -175,7 +181,7 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ ssh_user }}@{{ ssh_target }}
         "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
       changed_when: true
 
@@ -184,7 +190,7 @@
       when: ansible_ssh_pass is defined
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
-        {{ ansible_user }}@{{ inventory_hostname }}
+        {{ ssh_user }}@{{ ssh_target }}
         "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
       changed_when: true
 
