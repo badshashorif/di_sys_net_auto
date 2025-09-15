@@ -1,10 +1,10 @@
 ---
 - name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6
-  hosts: ACCESS_RTR
+  hosts: POP_RTR
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups/ACCESS_RTR"
+    backup_base_dir: "/root/network/backups/POP_RTR"
     retention_keep: 10
     ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
@@ -21,7 +21,7 @@
       ansible.builtin.set_fact:
         backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
-    - name: Ensure SSH port is defined (default 2222 for ACCESS_RTR)
+    - name: Ensure SSH port is defined (default 2222 for POP_RTR)
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(2222) }}"
 
