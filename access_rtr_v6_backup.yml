@@ -1,5 +1,5 @@
 ---
-- name: MikroTik minimal backup (.backup + single .rsc)
+- name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6
   hosts: ACCESS_RTR
   gather_facts: no
 
@@ -21,14 +21,14 @@
       ansible.builtin.set_fact:
         backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
-    - name: Ensure SSH port is defined (default 22)
+    - name: Ensure SSH port is defined (default 2222 for ACCESS_RTR)
       ansible.builtin.set_fact:
-        ansible_port: "{{ ansible_port | default(22) }}"
+        ansible_port: "{{ ansible_port | default(2222) }}"
 
-    # ---- universal SSH facts (fix for undefined ansible_user / ansible_host)
+    # ---- universal SSH facts (covers undefined ansible_user/host)
     - name: Derive SSH user and target host
       ansible.builtin.set_fact:
-        ssh_user:  "{{ ansible_user | default(ansible_ssh_user | default('admin')) }}"
+        ssh_user:   "{{ ansible_user | default(ansible_ssh_user | default('admin')) }}"
         ssh_target: "{{ ansible_host | default(inventory_hostname) }}"
 
     # ----- sshpass handling (only if password auth) -----
@@ -109,12 +109,13 @@
         "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
       changed_when: true
 
+    # ---------- Full binary backup (.backup) — RouterOS v6 ----------
     - name: Create full binary backup (.backup) on router (key auth)
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
       ansible.builtin.shell: >
         ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
-        "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
+        "/system backup save name={{ inventory_hostname }}_full_{{ backup_ts }} password=\"\""
       changed_when: true
 
     - name: Create full binary backup (.backup) on router (password auth)
@@ -123,7 +124,7 @@
       ansible.builtin.shell: >
         sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
         {{ ssh_user }}@{{ ssh_target }}
-        "/system/backup/save name={{ inventory_hostname }}_full_{{ backup_ts }} dont-encrypt=yes"
+        "/system backup save name={{ inventory_hostname }}_full_{{ backup_ts }} password=\"\""
       changed_when: true
 
     # ---------- Copy back to controller ----------
