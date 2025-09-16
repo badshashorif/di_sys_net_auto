@@ -1,11 +1,11 @@
 ---
 - name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6 (legacy SSH fix)
-  hosts: ACCESS_RTR
+  hosts: POP_RTR
   gather_facts: no
 
   vars:
     # লোকাল কন্ট্রোলারে কোথায় ফাইল রাখবেন
-    backup_base_dir: "/root/network/backups/ACCESS_RTR"
+    backup_base_dir: "/root/network/backups/POP_RTR"
     retention_keep: 10
 
     # 👇 নতুন OpenSSH ক্লায়েন্টে পুরনো ডিভাইসের সাথে negotiate করার জন্য legacy RSA allow করা হলো
@@ -29,7 +29,7 @@
       ansible.builtin.set_fact:
         backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
-    # ACCESS_RTR সাধারণত 2222; ইনভেন্টরিতে দিলে সেটা ওভাররাইড হবে
+    # POP_RTR সাধারণত 2222; ইনভেন্টরিতে দিলে সেটা ওভাররাইড হবে
     - name: Ensure SSH port is defined (default 2222)
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(2222) }}"
