@@ -6,7 +6,11 @@
   vars:
     backup_base_dir: "/root/network/backups/POP_RTR"
     retention_keep: 10
-    ssh_args_common: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ssh_args_common: >-
+      -o StrictHostKeyChecking=no
+      -o UserKnownHostsFile=/dev/null
+      -o HostKeyAlgorithms=+ssh-rsa
+      -o PubkeyAcceptedAlgorithms=+ssh-rsa
 
   pre_tasks:
     - name: Ensure per-host backup directory exists (local)
