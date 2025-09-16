@@ -1,59 +1,216 @@
 ---
-- hosts: CORE_RTR
+- name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6 (legacy SSH fix)
+  hosts: CORE_RTR
   gather_facts: no
+
   vars:
-    backup_dir: "/root/network/backups/CORE_RTR"
-  tasks:
+    # লোকাল কন্ট্রোলারে কোথায় ফাইল রাখবেন
+    backup_base_dir: "/root/network/backups/CORE_RTR"
+    retention_keep: 10
 
-    - name: Set ssh port (set defualt 22 port when port is not defined)
-      set_fact:
-        ansible_port: "{{ ansible_port | default(22) }}"
+    # 👇 নতুন OpenSSH ক্লায়েন্টে পুরনো ডিভাইসের সাথে negotiate করার জন্য legacy RSA allow করা হলো
+    # প্রয়োজনে ssh-dss ও যোগ করতে পারেন (security risk): +ssh-dss
+    ssh_args_common: >-
+      -o StrictHostKeyChecking=no
+      -o UserKnownHostsFile=/dev/null
+      -o HostKeyAlgorithms=+ssh-rsa
+      -o PubkeyAcceptedAlgorithms=+ssh-rsa
 
-    - name: Run backup with password (when password is defined)
+  pre_tasks:
+    - name: Ensure per-host backup directory exists (local)
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ backup_base_dir }}/{{ inventory_hostname }}"
+        state: directory
+        mode: "0750"
+
+    - name: Set backup timestamp (local)
+      delegate_to: localhost
+      ansible.builtin.set_fact:
+        backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
+
+    # CORE_RTR সাধারণত 2222; ইনভেন্টরিতে দিলে সেটা ওভাররাইড হবে
+    - name: Ensure SSH port is defined (default 2222)
+      ansible.builtin.set_fact:
+        ansible_port: "{{ ansible_port | default(2222) }}"
+
+    # universal SSH facts (inventory-তে ansible_user/host না থাকলেও চলবে)
+    - name: Derive SSH user and target host
+      ansible.builtin.set_fact:
+        ssh_user:   "{{ ansible_user | default(ansible_ssh_user | default('admin')) }}"
+        ssh_target: "{{ ansible_host | default(inventory_hostname) }}"
+
+    # ----- sshpass handling (only if password auth) -----
+    - name: Gather localhost facts (for pkg mgr)
       when: ansible_ssh_pass is defined
-      block:
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.setup:
 
-      - name: Ensure that sshpass is installed
-        ansible.builtin.shell: whereis sshpass | awk '{print $2}'
-        run_once: yes
-        register: sshpass
-        delegate_to: localhost
+    - name: Record local package manager
+      when: ansible_ssh_pass is defined
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.set_fact:
+        local_pkg_mgr: "{{ ansible_facts.pkg_mgr | default(ansible_facts.ansible_pkg_mgr | default('unknown')) }}"
 
-      - ansible.builtin.fail:
-          msg: >-
-            Playbook requrie sshpass to use password authenication, please install
-            sshpass and re-run same playbook again. 
-            You can found details in https://www.redhat.com/sysadmin/ssh-automation-sshpass
-        when: sshpass.stdout|length == 0
+    - name: Install sshpass via APT (Debian/Ubuntu)
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr in ['apt', 'apt-get']
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.apt:
+        name: sshpass
+        state: present
+        update_cache: yes
 
-      - name: gather export (with password authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          sshpass -p '{{ ansible_ssh_pass }}' ssh -o StrictHostKeyChecking=no {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} /export
-        register: export
-        delegate_to: localhost
+    - name: Enable EPEL (RHEL/CentOS) if needed
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'yum'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
 
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-        when: export is defined
-        delegate_to: localhost
+    - name: Install sshpass via YUM (RHEL/CentOS)
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'yum'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.yum:
+        name: sshpass
+        state: present
 
-    - name: Run backup withot password (when password is not defined)
+    - name: Install sshpass via DNF (Fedora/Rocky/Alma)
+      when:
+        - ansible_ssh_pass is defined
+        - local_pkg_mgr == 'dnf'
+      delegate_to: localhost
+      run_once: true
+      become: yes
+      ansible.builtin.dnf:
+        name: sshpass
+        state: present
+
+  tasks:
+    # ---------- Export on router ----------
+    - name: Export single config (.rsc) on router (key auth)
+      delegate_to: localhost
       when: ansible_ssh_pass is not defined
-      block:
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
+        "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
+      changed_when: true
 
-      - name: gather export (with passwordless authentication)
-        # shell with delegate_to: localhost works better that ansible.builtin.raw  
-        ansible.builtin.shell: >-
-          ssh {{ ansible_user }}@{{ inventory_hostname }} -p {{ ansible_port }} /export
-        register: export
-        delegate_to: localhost
+    - name: Export single config (.rsc) on router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}
+        "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
+      changed_when: true
 
-      - name: store export to local file
-        ansible.builtin.copy:
-          content: "{{ export.stdout }}"
-          dest: "{{ backup_dir }}/{{ inventory_hostname }}_config.{{ lookup('pipe', 'date +%Y-%m-%d@%H:%M:%S') }}.txt"
-        when: export is defined
-        delegate_to: localhost
+    # ---------- Full binary backup (.backup) — RouterOS v6 syntax ----------
+    - name: Create full binary backup (.backup) on router (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
+        "/system backup save name={{ inventory_hostname }}_full_{{ backup_ts }} password=\"\""
+      changed_when: true
+
+    - name: Create full binary backup (.backup) on router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}
+        "/system backup save name={{ inventory_hostname }}_full_{{ backup_ts }} password=\"\""
+      changed_when: true
+
+    # ---------- Copy back to controller ----------
+    - name: Copy config export to controller (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        scp -P {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
+        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
+
+    - name: Copy config export to controller (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' scp -P {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_config_{{ backup_ts }}.rsc
+        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
+
+    - name: Copy full binary backup to controller (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        scp -P {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
+        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
+
+    - name: Copy full binary backup to controller (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' scp -P {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
+        "{{ backup_base_dir }}/{{ inventory_hostname }}/"
+
+    # ---------- Cleanup on router (non-fatal; exact filenames) ----------
+    - name: Cleanup config .rsc from router (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
+        "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
+      changed_when: true
+
+    - name: Cleanup full .backup from router (key auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is not defined
+      ansible.builtin.shell: >
+        ssh -p {{ ansible_port }} {{ ssh_args_common }} {{ ssh_user }}@{{ ssh_target }}
+        "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
+      changed_when: true
+
+    - name: Cleanup config .rsc from router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}
+        "/file remove \"{{ inventory_hostname }}_config_{{ backup_ts }}.rsc\"" || true
+      changed_when: true
+
+    - name: Cleanup full .backup from router (password auth)
+      delegate_to: localhost
+      when: ansible_ssh_pass is defined
+      ansible.builtin.shell: >
+        sshpass -p '{{ ansible_ssh_pass }}' ssh -p {{ ansible_port }} {{ ssh_args_common }}
+        {{ ssh_user }}@{{ ssh_target }}
+        "/file remove \"{{ inventory_hostname }}_full_{{ backup_ts }}.backup\"" || true
+      changed_when: true
+
+    # ---------- Retention (local) ----------
+    - name: Retain only last N files (local)
+      delegate_to: localhost
+      changed_when: false
+      vars:
+        keep: "{{ retention_keep }}"
+        base: "{{ backup_base_dir }}/{{ inventory_hostname }}"
+      ansible.builtin.shell: |
+        ls -1t "{{ base }}/{{ inventory_hostname }}_config_*.rsc"  2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
+        ls -1t "{{ base }}/{{ inventory_hostname }}_full_*.backup" 2>/dev/null | awk 'NR>{{ keep }}' | xargs -r rm -f
