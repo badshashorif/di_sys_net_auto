@@ -1,11 +1,15 @@
 ---
-- name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6
-  hosts: POP_RTR
+- name: MikroTik minimal backup (.backup + single .rsc) — RouterOS v6 (legacy SSH fix)
+  hosts: ACCESS_RTR
   gather_facts: no
 
   vars:
-    backup_base_dir: "/root/network/backups/POP_RTR"
+    # লোকাল কন্ট্রোলারে কোথায় ফাইল রাখবেন
+    backup_base_dir: "/root/network/backups/ACCESS_RTR"
     retention_keep: 10
+
+    # 👇 নতুন OpenSSH ক্লায়েন্টে পুরনো ডিভাইসের সাথে negotiate করার জন্য legacy RSA allow করা হলো
+    # প্রয়োজনে ssh-dss ও যোগ করতে পারেন (security risk): +ssh-dss
     ssh_args_common: >-
       -o StrictHostKeyChecking=no
       -o UserKnownHostsFile=/dev/null
@@ -25,11 +29,12 @@
       ansible.builtin.set_fact:
         backup_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
-    - name: Ensure SSH port is defined (default 2222 for POP_RTR)
+    # ACCESS_RTR সাধারণত 2222; ইনভেন্টরিতে দিলে সেটা ওভাররাইড হবে
+    - name: Ensure SSH port is defined (default 2222)
       ansible.builtin.set_fact:
         ansible_port: "{{ ansible_port | default(2222) }}"
 
-    # ---- universal SSH facts (covers undefined ansible_user/host)
+    # universal SSH facts (inventory-তে ansible_user/host না থাকলেও চলবে)
     - name: Derive SSH user and target host
       ansible.builtin.set_fact:
         ssh_user:   "{{ ansible_user | default(ansible_ssh_user | default('admin')) }}"
@@ -95,7 +100,7 @@
         state: present
 
   tasks:
-    # ---------- Export on router (ONE-LINE) ----------
+    # ---------- Export on router ----------
     - name: Export single config (.rsc) on router (key auth)
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
@@ -113,7 +118,7 @@
         "/export file={{ inventory_hostname }}_config_{{ backup_ts }}"
       changed_when: true
 
-    # ---------- Full binary backup (.backup) — RouterOS v6 ----------
+    # ---------- Full binary backup (.backup) — RouterOS v6 syntax ----------
     - name: Create full binary backup (.backup) on router (key auth)
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
@@ -164,7 +169,7 @@
         {{ ssh_user }}@{{ ssh_target }}:/{{ inventory_hostname }}_full_{{ backup_ts }}.backup
         "{{ backup_base_dir }}/{{ inventory_hostname }}/"
 
-    # ---------- Cleanup on router (non-fatal) ----------
+    # ---------- Cleanup on router (non-fatal; exact filenames) ----------
     - name: Cleanup config .rsc from router (key auth)
       delegate_to: localhost
       when: ansible_ssh_pass is not defined
