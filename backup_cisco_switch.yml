@@ -1,6 +1,6 @@
 ---
 - name: Backup Cisco switch configuration (SSH)
-  hosts: cisco_switches
+  hosts: CORE_SW
   gather_facts: no
   connection: ansible.netcommon.network_cli
 
