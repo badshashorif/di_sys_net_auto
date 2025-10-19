@@ -4,22 +4,22 @@
   gather_facts: no
   connection: ansible.netcommon.network_cli
 
-  # Set these in inventory/group_vars/host_vars ideally; shown here for clarity
   vars:
     backup_root: "/root/network/backups"
-    # ansible_user: "{{ vault_user }}"         # recommended to store in Ansible Vault
-    # ansible_password: "{{ vault_password }}" # recommended to store in Ansible Vault
-    # ansible_network_os: "cisco.nxos.nxos"    # or "cisco.ios.ios" per device
-    # ansible_ssh_port: 22
 
   pre_tasks:
+    - name: Assert network OS is defined (nxos/ios)
+      ansible.builtin.assert:
+        that:
+          - ansible_network_os is defined
+        fail_msg: "ansible_network_os is not set. Define cisco.nxos.nxos or cisco.ios.ios for this host."
+
     - name: Build per-host backup dir locally
       ansible.builtin.file:
         path: "{{ backup_root }}/{{ inventory_hostname }}"
         state: directory
         mode: "0750"
       delegate_to: localhost
-      run_once: false
 
     - name: Make timestamp
       ansible.builtin.set_fact:
@@ -45,7 +45,7 @@
         backup_blob: |
           ===== Device: {{ inventory_hostname }} =====
           Time: {{ ts }}
-          Network OS: {{ ansible_network_os | default('N/A') }}
+          Network OS: {{ ansible_network_os }}
 
           ----- show interface description -----
           {{ sid.stdout | default('') }}
