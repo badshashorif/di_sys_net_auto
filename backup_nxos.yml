@@ -2,9 +2,14 @@
 - name: Backup Cisco Nexus configs
   hosts: nxos
   gather_facts: no
+  collections:
+    - cisco.nxos
+    - ansible.netcommon
 
   tasks:
-    - name: Create backup directory per device
+    - name: Create backup directory per device (on controller)
+      delegate_to: localhost
+      run_once: false
       ansible.builtin.file:
         path: "backups/{{ inventory_hostname }}"
         state: directory
