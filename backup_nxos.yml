@@ -2,7 +2,6 @@
 - name: Backup Cisco Nexus configs
   hosts: nxos
   gather_facts: no
-  connection: ansible.netcommon.network_cli
 
   tasks:
     - name: Create backup directory per device
