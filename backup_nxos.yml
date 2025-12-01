@@ -11,7 +11,7 @@
       delegate_to: localhost
       run_once: false
       ansible.builtin.file:
-        path: "backups/{{ inventory_hostname }}"
+        path: "/root/network/backups/CORE_SW/{{ inventory_hostname }}"
         state: directory
         mode: "0755"
 
@@ -20,4 +20,4 @@
         backup: yes
         backup_options:
           filename: "{{ inventory_hostname }}-{{ lookup('pipe','date +%Y%m%d-%H%M%S') }}.cfg"
-          dir_path: "backups/{{ inventory_hostname }}"
+          dir_path: "/root/network/backups/CORE_SW/{{ inventory_hostname }}"
