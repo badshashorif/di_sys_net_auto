@@ -1,0 +1,19 @@
+---
+- name: Backup Cisco Nexus configs
+  hosts: nxos
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+
+  tasks:
+    - name: Create backup directory per device
+      ansible.builtin.file:
+        path: "backups/{{ inventory_hostname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Backup running configuration
+      cisco.nxos.nxos_config:
+        backup: yes
+        backup_options:
+          filename: "{{ inventory_hostname }}-{{ lookup('pipe','date +%Y%m%d-%H%M%S') }}.cfg"
+          dir_path: "backups/{{ inventory_hostname }}"
