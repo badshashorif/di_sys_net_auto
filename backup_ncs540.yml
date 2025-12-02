@@ -1,0 +1,23 @@
+---
+- name: Backup Cisco NCS540 (IOS-XR) configs
+  hosts: iosxr
+  gather_facts: no
+  collections:
+    - cisco.iosxr
+    - ansible.netcommon
+
+  tasks:
+    - name: Create backup directory per device (on controller)
+      delegate_to: localhost
+      run_once: false
+      ansible.builtin.file:
+        path: "/root/network/backups/IOSXR/{{ inventory_hostname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Backup IOS-XR running configuration
+      cisco.iosxr.iosxr_config:
+        backup: yes
+        backup_options:
+          filename: "{{ inventory_hostname }}-{{ lookup('pipe','date +%Y%m%d-%H%M%S') }}.cfg"
+          dir_path: "/root/network/backups/IOSXR/{{ inventory_hostname }}"
