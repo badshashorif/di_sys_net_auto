@@ -1,5 +1,5 @@
 ---
-- hosts: NAT_RTR
+- hosts: INT_NAT_RTR
   gather_facts: no
   tasks:
 
