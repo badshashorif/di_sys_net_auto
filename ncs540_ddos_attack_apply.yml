@@ -1,0 +1,49 @@
+---
+- name: Apply DDoS attack mitigation plan on Cisco NCS540 (IOS-XR)
+  hosts: iosxr
+  gather_facts: no
+  collections:
+    - cisco.iosxr
+    - ansible.netcommon
+
+  tasks:
+    - name: Pre-check current prefix-set state
+      cisco.iosxr.iosxr_command:
+        commands:
+          - show running-config prefix-set SCL_INT_OUT_PRI
+          - show running-config prefix-set SCL_INT_OUT_SEC
+      register: precheck
+
+    - name: Print pre-check output to job log
+      ansible.builtin.debug:
+        msg:
+          - "=== BEFORE CHANGE : SCL_INT_OUT_PRI ==="
+          - "{{ precheck.stdout[0] | default('') }}"
+          - "=== BEFORE CHANGE : SCL_INT_OUT_SEC ==="
+          - "{{ precheck.stdout[1] | default('') }}"
+
+    - name: Apply attack plan prefix-set configuration
+      cisco.iosxr.iosxr_config:
+        src: "{{ playbook_dir }}/ncs540_ddos_attack_plan.xr"
+        match: none
+        replace: block
+      register: apply_result
+
+    - name: Print apply result
+      ansible.builtin.debug:
+        var: apply_result
+
+    - name: Post-check current prefix-set state
+      cisco.iosxr.iosxr_command:
+        commands:
+          - show running-config prefix-set SCL_INT_OUT_PRI
+          - show running-config prefix-set SCL_INT_OUT_SEC
+      register: postcheck
+
+    - name: Print post-check output to job log
+      ansible.builtin.debug:
+        msg:
+          - "=== AFTER CHANGE : SCL_INT_OUT_PRI ==="
+          - "{{ postcheck.stdout[0] | default('') }}"
+          - "=== AFTER CHANGE : SCL_INT_OUT_SEC ==="
+          - "{{ postcheck.stdout[1] | default('') }}"
