@@ -26,7 +26,7 @@
       cisco.iosxr.iosxr_config:
         src: "{{ playbook_dir }}/ncs540_ddos_attack_plan.xr"
         match: none
-        replace: block
+        comment: "DDoS mitigation attack plan applied by Semaphore"
       register: apply_result
 
     - name: Print apply result
